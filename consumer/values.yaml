@@ -1,0 +1,226 @@
+# -- no apis offered, thus no authentication framework required
+vcverifier:
+  enabled: false
+# -- no verifier deployed, thus no supporting services required
+credentials-config-service:
+  enabled: false
+# -- no verifier deployed, thus no supporting services required
+trusted-issuers-list:
+  enabled: false
+# -- no trusted-issuers-list deployed, thus no db for it required
+mysql:
+  enabled: false
+# -- no apis offered, thus no policy administration required
+odrl-pap:
+  enabled: false
+# -- no apis offered, thus no policy enforcement required
+apisix:
+  enabled: false
+# -- nothing offered, thus no broker
+scorpio:
+  enabled: false
+# -- no scorpio, thus no db for it
+postgis:
+  enabled: false
+# -- nothing offered, thus no api to offer something required
+tm-forum-api:
+  enabled: false
+# -- nothing offered, thus no contracts need to be managed
+contract-management:
+  enabled: false
+
+# -- database for keycloak as the issuer needs to be registered
+postgresql:
+  primary:
+    persistence:
+      enabled: true      
+      # use one of the classes provided by your cluster
+      storageClass: local-path
+
+# -- keycloak as issuer of verifiable credentials is required
+keycloak:
+  ingress:
+    enabled: true
+    hostname: keycloak-consumer.127.0.0.1.nip.io
+  
+  externalDatabase:
+    host: postgresql
+    database: keycloak
+    user: postgres
+    existingSecret: database-secret
+    existingSecretPasswordKey: postgres-admin-password
+
+  extraEnvVars:
+    # import the configured realm
+    - name: KEYCLOAK_EXTRA_ARGS
+      value: "--import-realm"
+    # enable the issuance feature
+    - name: KC_FEATURES
+      value: "oid4vc-vci"
+    # indicates ssl is terminated at the edge
+    - name: KC_PROXY
+      value: "edge"
+    # password for reading the key store connected to the did
+    - name: STORE_PASS
+      value: test
+    # keycloak admin password
+    - name: KC_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: issuance-secret
+          key: keycloak-admin
+    # log level for keycloak
+    - name: KC_LOG_LEVEL
+      value: INFO
+    # hostname of keycloak to be set as part of the realm config
+    - name: KC_HOSTNAME
+      value: keycloak-consumer.127.0.0.1.nip.io
+    # did of the consumer
+    - name: DID
+      value: "did:key:zDnaeu8wo7cYJyRUm15xoDuhEF2EB4x9Vph9AYph1Dg7JK8yW"
+
+  extraVolumeMounts:
+    - name: did-material
+      mountPath: /did-material/cert.pfx
+      subPath: cert.pfx
+    - name: realms
+      mountPath: /opt/bitnami/keycloak/data/import
+
+  extraVolumes:
+    - name: did-material
+      secret:
+        secretName: consumer-identity
+    - name: realms
+      configMap:
+        name: test-realm-realm
+
+  realm:
+    frontendUrl: http://keycloak-consumer.127.0.0.1.nip.io:8080
+    import: true
+    name: test-realm
+    clientRoles: |
+      "${DID}": [
+        {
+          "name": "READER",
+          "description": "Is allowed to see offers etc.",
+          "clientRole": true
+        },
+        {
+          "name": "OPERATOR",
+          "description": "Is allowed to operate clusters.",
+          "clientRole": true
+        }
+      ]
+
+    users: |
+      {
+        "username": "test-user",
+        "enabled": true,
+        "email": "test@user.org",
+        "firstName": "Test",
+        "lastName": "Reader",
+        "credentials": [
+          {
+            "type": "password",
+            "value": "test"
+          }
+        ],
+        "clientRoles": {
+          "${DID}": [
+            "OPERATOR"
+          ],
+          "account": [
+            "view-profile",
+            "manage-account"
+          ]
+        },
+        "groups": [
+        ]
+      }
+    clients: |
+      {
+        "clientId": "${DID}",
+        "enabled": true,
+        "description": "Client to connect test.org",
+        "surrogateAuthRequired": false,
+        "alwaysDisplayInConsole": false,
+        "clientAuthenticatorType": "client-secret",
+        "defaultRoles": [],
+        "redirectUris": [],
+        "webOrigins": [],
+        "notBefore": 0,
+        "bearerOnly": false,
+        "consentRequired": false,
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "serviceAccountsEnabled": false,
+        "publicClient": false,
+        "frontchannelLogout": false,
+        "protocol": "oid4vc",
+        "attributes": {
+          "client.secret.creation.time": "1675260539",
+          "vc.user-credential.format": "jwt_vc",
+          "vc.user-credential.scope": "UserCredential",
+          "vc.verifiable-credential.format": "jwt_vc",
+          "vc.verifiable-credential.scope": "VerifiableCredential",
+          "vc.operator-credential.format": "jwt_vc",
+          "vc.operator-credential.scope": "OperatorCredential"
+        },
+        "protocolMappers": [
+          {
+            "name": "target-role-mapper",
+            "protocol": "oid4vc",
+            "protocolMapper": "oid4vc-target-role-mapper",
+            "config": {
+              "subjectProperty": "roles",
+              "clientId": "${DID}",
+              "supportedCredentialTypes": "OperatorCredential"
+            }
+          },
+          {
+            "name": "context-mapper",
+            "protocol": "oid4vc",
+            "protocolMapper": "oid4vc-context-mapper",
+            "config": {
+              "context": "https://www.w3.org/2018/credentials/v1",
+              "supportedCredentialTypes": "VerifiableCredential,UserCredential,OperatorCredential"
+            }
+          },
+          {
+            "name": "email-mapper",
+            "protocol": "oid4vc",
+            "protocolMapper": "oid4vc-user-attribute-mapper",
+            "config": {
+              "subjectProperty": "email",
+              "userAttribute": "email",
+              "supportedCredentialTypes": "UserCredential,OperatorCredential"
+            }
+          },
+          {
+            "name": "firstName-mapper",
+            "protocol": "oid4vc",
+            "protocolMapper": "oid4vc-user-attribute-mapper",
+            "config": {
+              "subjectProperty": "firstName",
+              "userAttribute": "firstName",
+              "supportedCredentialTypes": "UserCredential,OperatorCredential"
+            }
+          },
+          {
+            "name": "lastName-mapper",
+            "protocol": "oid4vc",
+            "protocolMapper": "oid4vc-user-attribute-mapper",
+            "config": {
+              "subjectProperty": "lastName",
+              "userAttribute": "lastName",
+              "supportedCredentialTypes": "UserCredential,OperatorCredential"
+            }
+          }
+        ],
+        "authenticationFlowBindingOverrides": {},
+        "fullScopeAllowed": true,
+        "nodeReRegistrationTimeout": -1,
+        "defaultClientScopes": [],
+        "optionalClientScopes": []
+      }

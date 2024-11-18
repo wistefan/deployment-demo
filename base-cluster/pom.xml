@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.fiware.dataspace</groupId>
+    <artifactId>connector</artifactId>
+    <version>0.0.1</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <jdk.version>17</jdk.version>
+        <release.version>17</release.version>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <version.io.kokuwa.maven.k3s-plugin>1.3.0</version.io.kokuwa.maven.k3s-plugin>
+        <version.io.kokuwa.helm-maven-plugin>6.13.0</version.io.kokuwa.helm-maven-plugin>
+        <version.org.apache.maven.plugins.maven-install>3.1.1</version.org.apache.maven.plugins.maven-install>
+        <version.org.apache.maven.plugins.maven-source>2.4</version.org.apache.maven.plugins.maven-source>
+        <version.org.apache.maven.plugins.maven-jar>3.3.0</version.org.apache.maven.plugins.maven-jar>
+        <version.org.apache.maven.plugins.maven-dependency>3.1.1</version.org.apache.maven.plugins.maven-dependency>
+        <version.org.apache.maven.plugins.maven-surefire>3.0.0</version.org.apache.maven.plugins.maven-surefire>
+        <version.org.apache.maven.plugins.maven-failsafe>3.0.0</version.org.apache.maven.plugins.maven-failsafe>
+
+        <main.basedir>${project.basedir}</main.basedir>
+    </properties>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+                <filtering>true</filtering>
+            </testResource>
+        </testResources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>${version.org.apache.maven.plugins.maven-install}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${version.org.apache.maven.plugins.maven-source}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>${version.org.apache.maven.plugins.maven-dependency}</version>
+
+            </plugin>
+            <!-- disable jar/surefire -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${version.org.apache.maven.plugins.maven-jar}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${version.org.apache.maven.plugins.maven-surefire}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${version.org.apache.maven.plugins.maven-failsafe}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>io.kokuwa.maven</groupId>
+                <artifactId>k3s-maven-plugin</artifactId>
+                <version>${version.io.kokuwa.maven.k3s-plugin}</version>
+                <configuration>
+                    <portBindings>
+                        <portBinding>8080:8080</portBinding>
+                        <portBinding>8888:8888</portBinding>
+                        <portBinding>8443:8443</portBinding>
+                    </portBindings>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>create-namespaces</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>run</goal>
+                            <goal>apply</goal>
+                        </goals>
+                        <configuration>
+                            <failIfExists>false</failIfExists>
+                            <manifests>${project.basedir}/k3s/namespaces</manifests>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>apply-infra</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>apply</goal>
+                        </goals>
+                        <configuration>
+                            <manifests>${project.basedir}/k3s/infra</manifests>
+                            <timeout>500</timeout>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
