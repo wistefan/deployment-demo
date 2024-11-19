@@ -2,6 +2,68 @@
 keycloak:
   enabled: false
 
+## AUTHENTICATION
+
+vcverifier:
+  # make the verifier publicly accessible
+  ingress:
+    enabled: true
+    hosts:
+      - host: provider-verifier.127.0.0.1.nip.io
+        paths:
+          - "/"
+  deployment:
+    verifier:
+      # address of the trust anchor
+      tirAddress: http://tir.127.0.0.1.nip.io:8080/
+      did: did:key:zDnaeQfjsx66YNYV86SDBB1e5kunWKJcWwk686dvjirEE7pqW
+    # public address of the verifier, to be provided as oid-config
+    server:
+      host: http://provider-verifier.127.0.0.1.nip.io:8080
+    # access to the internal credentials-config-service
+    configRepo:
+      configEndpoint: http://credentials-config-service:8080
+
+credentials-config-service:
+  enabled: true
+
+# internal trusted issuers list
+trusted-issuers-list:
+  # only open for demo purposes
+  ingress:
+    til:
+      enabled: true
+      hosts:
+        - host: til-provider.127.0.0.1.nip.io
+          paths:
+            - /
+
+# mysql used for the credentials config service
+mysql:
+  primary:
+    persistence:
+      enabled: true      
+      # use one of the classes provided by your cluster
+      storageClass: local-path
+
+## AUTHORIZATION
+
+# serves configuration of the dataspace
+dataSpaceConfig:
+  enabled: true
+  
+  ## Defaults
+  serviceType: ClusterIP
+  port: 3002
+  supportedModels:
+    - "https://raw.githubusercontent.com/smart-data-models/dataModel.Consumption/master/ConsumptionPoint/schema.json"
+    - "https://raw.githubusercontent.com/smart-data-models/dataModel.Consumption/master/ConsumptionCost/schema.json"
+  supportedProtocols:
+    - http
+    - https
+  authenticationProtocols:
+    - oid4vp
+
 # -- apisix configuration
 apisix:
   dataPlane:
@@ -62,73 +124,6 @@ apisix:
 opa:
   # -- should an opa sidecar be deployed to apisix
   enabled: true
-  # -- address of the pap to get the policies from
-  resourceUrl: http://odrl-pap:8080/bundles/service/v1
-  # -- port to make opa available at
-  port: 8181
-  # -- pull delays for the policies bundle
-  policies:
-    minDelay: 2
-    maxDelay: 4
-  # -- pull delays for the methods bundle
-  methods:
-    minDelay: 1
-    maxDelay: 3
-  # -- pull delays for the data bundle
-  data:
-    minDelay: 1
-    maxDelay: 15
-
-vcverifier:
-  # make the verifier publicly accessible
-  ingress:
-    enabled: true
-    hosts:
-      - host: provider-verifier.127.0.0.1.nip.io
-        paths:
-          - "/"
-  deployment:
-    verifier:
-      # address of the trust anchor
-      tirAddress: http://tir.127.0.0.1.nip.io:8080/
-      did: did:key:zDnaenDzfrfaMSUPqZSrAcryFgZEEc6Hmg9VotkdREHd9tMoj
-    # public address of the verifier, to be provided as oid-config
-    server:
-      host: http://provider-verifier.127.0.0.1.nip.io:8080
-    # access to the internal credentials-config-service
-    configRepo:
-      configEndpoint: http://credentials-config-service:8080
-    logging:
-      level: DEBUG
-
-credentials-config-service:
-  enabled: true
-
-trusted-issuers-list:
-  # only open for demonstrational purposes
-  ingress:
-    til:
-      enabled: true
-      hosts:
-        - host: til-provider.127.0.0.1.nip.io
-          paths:
-            - /
-
-# mysql used for the credentials config service
-mysql:
-  primary:
-    persistence:
-      enabled: true      
-      # use one of the classes provided by your cluster
-      storageClass: local-path
-
-# database used for scorpio
-postgis:
-  primary:
-    persistence:
-      enabled: true      
-      # use one of the classes provided by your cluster
-      storageClass: local-path
 
 # database used for odrl-pap
 postgresql:
@@ -138,22 +133,31 @@ postgresql:
       # use one of the classes provided by your cluster
       storageClass: local-path
 
-# serves configuration of the dataspace
-dataSpaceConfig:
-  enabled: true
-  serviceType: ClusterIP
-  port: 3002
-  supportedModels:
-    - "https://raw.githubusercontent.com/smart-data-models/dataModel.Consumption/master/ConsumptionPoint/schema.json"
-    - "https://raw.githubusercontent.com/smart-data-models/dataModel.Consumption/master/ConsumptionCost/schema.json"
-  supportedProtocols:
-    - http
-    - https
-  authenticationProtocols:
-    - oid4vp
+# policy administration point
+odrl-pap:
+  additonalEnvVars:
+    # needs to know the providers identity to 
+    - name: GENERAL_ORGANIZATION_DID
+      value: did:key:zDnaeQfjsx66YNYV86SDBB1e5kunWKJcWwk686dvjirEE7pqW
+  ingress:
+    enabled: true
+    hosts:
+      - host: pap-provider.127.0.0.1.nip.io
+        paths:
+          - "/"
+
+# database used for scorpio
+postgis:
+  primary:
+    persistence:
+      enabled: true      
+      # use one of the classes provided by your cluster
+      storageClass: local-path
 
 # the data service
 scorpio:
+  enabled: true
+
   # configuration for the dataservice at the credentials-config-service
   ccs:
     defaultOidcScope:
@@ -172,65 +176,7 @@ scorpio:
           trustedIssuersLists:
             - http://trusted-issuers-list:8080
 
-  # defaults
-  ## configuration of the image to be used
-  image:
-    # -- repository to be used - resource friendly all-in-one-runner without kafka
-    repository: scorpiobroker/all-in-one-runner
-    # -- tag of the image to be used - latest java image without kafka
-    tag: java-4.1.11
-  ## configuration of the database to be used by broker
-  db:
-    # -- host of the db
-    dbhost: data-service-postgis
-    # -- username to be used
-    user: postgres
-    existingSecret:
-      enabled: true
-      name: data-service-secret
-      key: postgres-admin-password
-  ## configuration of the readiness probe
-  readinessProbe:
-    # -- path to be used for the readiness probe, older versions used /actuator/health
-    path: /q/health
-  ## configuration of the liveness probe
-  livenessProbe:
-    # -- path to be used for the readiness probe, older versions used /actuator/health
-    path: /q/health
-  ## configuration to be used for the service offered by scorpio
-  service:
-    # -- ClusterIP is the recommended type for most clusters
-    type: ClusterIP
-
-  # -- additional init containers to be used for the dataplane
-  initContainers:
-    # -- curl container to register at the credentials config service
-    - name: register-credential-config
-      image: quay.io/curl/curl:8.1.2
-      command: [ "/bin/sh", "-c", "/bin/init.sh" ]
-      volumeMounts:
-        - name: scorpio-registration
-          mountPath: /bin/init.sh
-          subPath: init.sh
-  # -- additonal volumes to be mounted for the dataplane
-  additionalVolumes:
-    - name: scorpio-registration
-      configMap:
-        name: scorpio-registration
-        defaultMode: 0755
-
-# policy administration point
-odrl-pap:
-  additonalEnvVars:
-    # needs to know the providers identity to 
-    - name: GENERAL_ORGANIZATION_DID
-      value: did:key:zDnaenDzfrfaMSUPqZSrAcryFgZEEc6Hmg9VotkdREHd9tMoj
-  ingress:
-    enabled: true
-    hosts:
-      - host: pap-provider.127.0.0.1.nip.io
-        paths:
-          - "/"
+## TMForum API
 
 # tmforum apis to support contracting
 tm-forum-api:
@@ -240,119 +186,7 @@ tm-forum-api:
       - host: tm-forum-api.127.0.0.1.nip.io
         paths:
           - /
-  
-  # defaults
-  # configuration to be used by every api-deployment if nothing specific is provided.
-  defaultConfig:
-    # --  ngsi-ld broker connection information
-    ngsiLd:
-      # -- address of the broker
-      url: http://data-service-scorpio:9090
-    contextUrl: https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld
-
-  # enable the api proxy
-  apiProxy:
-    enabled: true
-    image:
-      tag: distroless-v1.27-latest
-    service:
-      # -- name to be used for the proxy service.
-      nameOverride: tm-forum-api
-
-  # -- list of apis to be deployed
-  # -- every api needs to define a name and image. Basepath is required when routes or ingress will be enabled. Beside that, they can overwrite the default-config by using the same keys.
-  # -- be aware: when you change the image repositrory or the tag for an api, you have to provide both values for the changes to take effect
-  apis:
-    - name: party-catalog
-      image: tmforum-party-catalog
-      basePath: /tmf-api/party/v4
-
-    - name: customer-bill-management
-      image: tmforum-customer-bill-management
-      basePath: /tmf-api/customerBillManagement/v4
-
-    - name: customer-management
-      image: tmforum-customer-management
-      basePath: /tmf-api/customerManagement/v4
-
-    - name: product-catalog
-      image: tmforum-product-catalog
-      basePath: /tmf-api/productCatalogManagement/v4
-
-    - name: product-inventory
-      image: tmforum-product-inventory
-      basePath: /tmf-api/productInventory/v4
-
-    - name: product-ordering-management
-      image: tmforum-product-ordering-management
-      basePath: /tmf-api/productOrderingManagement/v4
-
-    - name: resource-catalog
-      image: tmforum-resource-catalog
-      basePath: /tmf-api/resourceCatalog/v4
-
-    - name: resource-function-activation
-      image: tmforum-resource-function-activation
-      basePath: /tmf-api/resourceFunctionActivation/v4
-
-    - name: resource-inventory
-      image: tmforum-resource-inventory
-      basePath: /tmf-api/resourceInventoryManagement/v4
-
-    - name: service-catalog
-      image: tmforum-service-catalog
-      basePath: /tmf-api/serviceCatalogManagement/v4
-
-  # redis caching
-  redis:
-    enabled: false
-
-  # register tmforum at the credentials-config-service, in case it also should be secured with apisix
-  registration:
-    enabled: false
-    # -- name to be used for the registration jobs
-    name: tmf-api-registration
-    # -- configuration to register the dataplane at the credentials-config-service
-    ccs:
-      # -- endpoint of the ccs to regsiter at
-      endpoint: http://credentials-config-service:8080
-      # -- service id of the data-service to be used
-      id: tmf-api
-      # -- default scope to be created for the data plane
-      defaultOidcScope:
-        # -- name of the scope
-        name: default
-        # -- name of the default credential to be configured
-        credentialType: VerifiableCredential
-        # -- needs to be updated for the concrete dataspace
-        trustedParticipantsLists: http://tir.trust-anchor.org
-        trustedIssuersLists: http://trusted-issuers-list:8080
 
 # contract management component and the credential type it should register for a bought service
 contract-management:
-  til:
-    credentialType: OperatorCredential
-  # configuration of the apis used by the contract management
-  services:
-    ## Config for Trusted Issuers List
-    til:
-      ## URL of the Trusted Issuers List Service
-      url: http://trusted-issuers-list:8080
-    ## Config for the TM Forum Service hosting the APIs
-    product:
-      ## URL of the TM Forum Service hosting the Product Ordering API
-      url: http://tm-forum-api:8080
-    party:
-      ## URL of the TM Forum Service hosting the Party API
-      url: http://tm-forum-api:8080
-
-# internal trusted issuers list
-trusted-issuers-list:
-  # only open for demo purposes
-  ingress:
-    til:
-      enabled: true
-      hosts:
-        - host: til-provider.127.0.0.1.nip.io
-          paths:
-            - /
+  enabled: true

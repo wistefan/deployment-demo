@@ -2,13 +2,20 @@
 generatePasswords:
   # -- should a password for the database connection of trust-anchor components be generated in the cluster
   enabled: true
-  #-- name of the secret to put the generated password into
-  secretName: mysql-database-secret
 
 # -- configuration for the mysql to be deployed as part of the trust-anchor, see https://github.com/bitnami/charts/tree/main/bitnami/mysql for all options
 mysql:
   # -- should it be enabled? set to false if one outside the chart is used.
   enabled: true
+
+  # -- configure persistence, depending on the storageClasses available in your cluster
+  primary:
+    persistence:
+      # use one of the classes provided by your cluster
+      storageClass: local-path
+
+  ## defaults
+
   # -- allows to set a fixed name for the services
   fullnameOverride: trust-anchor-mysql
   # -- configure authentication to mysql
@@ -20,16 +27,25 @@ mysql:
     create.sql: |
       CREATE DATABASE tirdb;
   
-  # -- configure persistence, depending on the storageClasses available in your cluster
-  primary:
-    persistence:
-      # use one of the classes provided by your cluster
-      storageClass: local-path
 
 # -- configuration for the trusted-issuers-list to be deployed as part of the trust-anchor, see https://github.com/FIWARE/helm-charts/tree/main/charts/trusted-issuers-list for all options
 trusted-issuers-list:
   # -- should it be enabled? set to false if one outside the chart is used.
   enabled: true
+
+  # -- configuration to make the list "publicly" accessible through our ingress controller
+  ingress:
+    tir:
+      enabled: true
+      hosts:
+        - host: tir.127.0.0.1.nip.io
+    til:
+      enabled: true
+      hosts:
+        - host: til.127.0.0.1.nip.io
+
+  ## defaults
+
   # -- allows to set a fixed name for the services
   fullnameOverride: tir
   # -- connection to the database
@@ -47,14 +63,3 @@ trusted-issuers-list:
     host:  trust-anchor-mysql
     # -- name of the schema inside the db
     name: tirdb
-
-  # -- configuration to make the list "publicly" accessible through our ingress controller
-  ingress:
-    tir:
-      enabled: true
-      hosts:
-        - host: tir.127.0.0.1.nip.io
-    til:
-      enabled: true
-      hosts:
-        - host: til.127.0.0.1.nip.io
