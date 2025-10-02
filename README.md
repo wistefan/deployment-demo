@@ -3,7 +3,7 @@
 ```sh
   cd base-cluster
   mvn clean deploy
-  export KUBECONFIG=/home/stefanw/git/wistefan/deployment-demo/base-cluster/target/k3s.yaml
+  export  KUBECONFIG=$(pwd)/target/k3s.yaml
 
   # enable storage
   kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.30/deploy/local-path-storage.yaml
